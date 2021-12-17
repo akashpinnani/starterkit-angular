@@ -1,0 +1,64 @@
+version: 2.1
+jobs:
+  test_build_and_deploy:
+    docker:
+      - image: circleci/node:12-browsers
+    working_directory: ~/repo
+    steps:
+      - checkout
+
+      - run:
+          name: Show current branch
+          command: echo ${CIRCLE_BRANCH}
+
+      # Restore local dependencies from cache
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "package-lock.json" }}
+            - v1-dependencies-
+
+      # Install project dependencies
+      - run:
+          name: Install local dependencies
+          command: npm install
+
+      # Cache local dependencies if they don't exist
+      - save_cache:
+          key: v1-dependencies-{{ checksum "package-lock.json" }}
+          paths:
+            - node_modules
+
+      # Lint the source code
+      - run:
+          name: Linting
+          command: npm run lint
+
+      # Test the source code
+      - run:
+          name: Testing
+          command: npm run test:ci
+
+      # End to End test
+      - run:
+          name: End to End Test
+          command: npm run e2e
+
+      # Build
+      - run:
+          name: Building project
+          command: npm run build
+
+      # Deploy to firebase
+      - run:
+          name: Deploying to Firebase
+          command: ./node_modules/.bin/firebase deploy --token $FIREBASE_TOKEN
+
+workflows:
+  version: 2
+  test_build_and_deploy:
+    jobs:
+      - test_build_and_deploy:
+          filters:
+            branches:
+              only:
+                - master
